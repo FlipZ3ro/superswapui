@@ -250,8 +250,8 @@ export function JupiterSwapForm() {
   }, [wallet.publicKey]);
 
   const filteredOutputTokens = useMemo(() => {
-    const allTokens = [...tokens, ...topTokens.map(address => tokens.find(t => t.address === address)).filter(Boolean)];
-    return allTokens.filter((token: any) => 
+    const allTokens = [...tokens, ...topTokens];
+    return allTokens.filter((token: TokenInfo) => 
       token.symbol.toLowerCase().includes(searchOutput.toLowerCase()) ||
       token.name.toLowerCase().includes(searchOutput.toLowerCase())
     );
