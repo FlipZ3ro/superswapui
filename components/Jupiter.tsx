@@ -167,7 +167,7 @@ export default function JupiterSwapForm() {
       console.error("Failed to fetch quote:", error)
     }
     setIsLoading(false)
-  }, [formValue, inputToken, outputToken, jupiterApi])
+  }, [ inputToken, outputToken])
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -177,7 +177,7 @@ export default function JupiterSwapForm() {
     }, 500) // Debounce for 500ms
 
     return () => clearTimeout(debounceTimer)
-  }, [formValue.amount, formValue.inputMint, formValue.outputMint, fetchQuote])
+  }, [formValue.amount, formValue.inputMint, formValue.outputMint])
 
   const handleSwap = async () => {
     if (!quoteResponse || !wallet.publicKey || !wallet.signTransaction) return
@@ -682,19 +682,6 @@ console.log(123123)
           )}
         </div>
       </CardContent>
-      {inputToken && outputToken && quoteResponse && (
-        <div className="mt-4 text-sm">
-          <p className="font-semibold">Token Ratio:</p>
-          <p>
-            {inputToken.symbol}/{outputToken.symbol}:{' '}
-            {(parseFloat(quoteResponse.outAmount) / (10 ** outputToken.decimals) / parseFloat(formValue.amount)).toFixed(6)}
-          </p>
-          <p>
-            {outputToken.symbol}/{inputToken.symbol}:{' '}
-            {(parseFloat(formValue.amount) / (parseFloat(quoteResponse.outAmount) / (10 ** outputToken.decimals))).toFixed(6)}
-          </p>
-        </div>
-      )}
       <CardFooter>
         {!poolExists && inputToken && outputToken ? (
           <div className="w-full space-y-4">
