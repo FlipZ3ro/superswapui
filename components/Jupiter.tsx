@@ -150,7 +150,7 @@ export default function JupiterSwapForm() {
     };
     fetchTokens()
   }, [wallet.publicKey])
-  const [success,setSucess] = useState("")
+  const [success,setSuccess] = useState("")
   const fetchQuote = useCallback(async () => {
     if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken) return
     setIsLoading(true)
