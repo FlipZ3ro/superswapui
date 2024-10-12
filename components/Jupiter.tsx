@@ -637,7 +637,7 @@ console.log(123123)
       <CardFooter>
         {!poolExists && inputToken && outputToken ? (
           <div className="w-full space-y-4">
-            <p className="text-center">Pool does not exist. Create it first.</p>
+            <p className="text-center">Gobbler pool does not exist. Create it if you want.</p>
             <div>
               <label htmlFor="tokenName" className="block text-sm font-medium text-gray-700">
                 Token Name
