@@ -289,12 +289,19 @@ const [checkedPools, setCheckedPools] = useState<Set<string>>(new Set());
 const checkPoolExists = useCallback(async () => {
   if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken || !wallet.publicKey) return;
 
-  const configId = 0
+  const configId = 0;
   const [ammConfigKey, _bump] = PublicKey.findProgramAddressSync(
     [Buffer.from('amm_config'), new BN(configId).toArrayLike(Buffer, 'be', 8)],
     CREATE_CPMM_POOL_PROGRAM
-  )  
-console.log(123123)
+  );
+  const poolKeys = getCreatePoolKeys({
+    creator: wallet.publicKey,
+    programId: CREATE_CPMM_POOL_PROGRAM,
+    mintA: new PublicKey(formValue.inputMint),
+    mintB: new PublicKey(formValue.outputMint),
+    configId: ammConfigKey
+  });
+  console.log('Pool keys:', poolKeys);
   try {
     if (checkedPools.has(poolKeys.poolId.toString())) return;
     const poolInfo = await connection.getAccountInfo(poolKeys.poolId)
