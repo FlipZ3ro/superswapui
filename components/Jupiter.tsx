@@ -150,7 +150,7 @@ export default function JupiterSwapForm() {
     };
     fetchTokens()
   }, [wallet.publicKey])
-
+  const [success,setSucess] = useState("")
   const fetchQuote = useCallback(async () => {
     if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken) return
     setIsLoading(true)
@@ -211,11 +211,13 @@ export default function JupiterSwapForm() {
       });
       
       console.log(`Swap transaction successful: https://solscan.io/tx/${txid}`);
+      setSuccess(`Swap transaction successful: https://solscan.io/tx/${txid}`);
     } catch (error) {
+      setError(`Swap failed: ${error instanceof Error ? error.message : String(error)}`);
       console.error("Swap failed:", error)
     }
   }
-
+  const [error, setError] = useState("")
   const switchTokens = () => {
     setFormValue(prev => ({
       ...prev,
@@ -547,6 +549,18 @@ console.log(123123)
       <CardHeader>
         <CardTitle>Swap Tokens</CardTitle>
       </CardHeader>
+      {success != "" && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">Success!</strong>
+          <span className="block sm:inline"> {success}</span>
+        </div>
+      )}
+      {error != ""  && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">Error!</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
       <CardContent>
         <div className="space-y-4">
           <div>
