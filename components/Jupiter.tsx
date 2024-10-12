@@ -326,6 +326,9 @@ console.log(123123)
       checkPoolExists();
     }
   }, [inputToken, outputToken]);
+  const [amountA, setAmountA] = useState("");
+  const [amountB, setAmountB] = useState("");
+
 
   const createGobblerPools = async () => {
     if (!wallet || !wallet.publicKey || !inputToken || !outputToken || !tokenName || !tokenSymbol || !tokenDescription || !tokenImage || !umi) {
@@ -402,16 +405,16 @@ console.log(123123)
       }
 
       const uri = await umi.uploader.uploadJson(metadata)
-
       const tokenAMint = new PublicKey(inputToken.address)
       const tokenBMint = new PublicKey(outputToken.address)
       const isFront = new BN(tokenAMint.toBuffer()).lte(new BN(tokenBMint.toBuffer()))
 
       const [mintA, mintB] = isFront ? [tokenAMint, tokenBMint] : [tokenBMint, tokenAMint]
-      const amountA = new BN(formValue.amount)
-      const amountB = new BN(quoteResponse.outAmount)
+      const aa = new BN(amountA).mul(new BN(10).pow(new BN(inputToken.decimals)))
+      const ab = new BN(amountB).mul(new BN(10).pow(new BN(outputToken.decimals)))
       const [tokenAInfo, tokenBInfo] = isFront ? [inputToken, outputToken] : [outputToken, inputToken]
-      const [tokenAAmount, tokenBAmount] = isFront ? [amountA, amountB] : [amountB, amountA]
+      const [tokenAAmount, tokenBAmount] = isFront ? [aa, ab] : [ab, aa]
+
       const configId = 0
       const [ammConfigKey, _bump] = PublicKey.findProgramAddressSync(
         [Buffer.from('amm_config'), new BN(configId).toArrayLike(Buffer, 'be', 8)],
@@ -739,6 +742,28 @@ console.log(123123)
                 accept="image/*"
                 onChange={(e) => setTokenImage(e.target.files?.[0] || null)}
                 className="mt-1"
+              />
+            </div>
+            <div>
+              <label htmlFor="tokenAAmount" className="block text-sm font-medium text-gray-700">
+                {inputToken.symbol} Amount
+              </label>
+              <Input
+                id="tokenAAmount"
+                value={amountA}
+                onChange={(e) => setAmountA(e.target.value)}
+                placeholder={`Enter ${inputToken.symbol} amount`}
+              />
+            </div>
+            <div>
+              <label htmlFor="tokenBAmount" className="block text-sm font-medium text-gray-700">
+                {outputToken.symbol} Amount
+              </label>
+              <Input
+                id="tokenBAmount"
+                value={amountB}
+                onChange={(e) => setAmountB(e.target.value)}
+                placeholder={`Enter ${outputToken.symbol} amount`}
               />
             </div>
             <Button onClick={createGobblerPools} className="w-full">
