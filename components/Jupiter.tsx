@@ -212,13 +212,16 @@ export function JupiterSwapForm() {
 
   const handleInputSearch = async (value: string) => {
     setSearchInput(value);
+    // No API call for search, just filter the existing tokens
     if (value.length > 0) {
-      const response = await fetch(`/api/tokens?search=${encodeURIComponent(value)}&limit=100&offset=0`);
-      const { tokens: searchResults } = await response.json();
-      setTokens(searchResults);
+      const filteredTokens = tokens.filter(token => 
+        token.symbol.toLowerCase().includes(value.toLowerCase()) ||
+        token.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setTokens(filteredTokens);
     } else {
-      // If search is cleared, reset to user's tokens
-      setTokens(tokens);
+      // If search is cleared, reset to original tokens
+      setTokens(originalTokens);
     }
   };
 
