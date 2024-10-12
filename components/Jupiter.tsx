@@ -403,8 +403,8 @@ const checkPoolExists = useCallback(async () => {
       const isFront = new BN(tokenAMint.toBuffer()).lte(new BN(tokenBMint.toBuffer()))
 
       const [mintA, mintB] = isFront ? [tokenAMint, tokenBMint] : [tokenBMint, tokenAMint]
-      const aa = new BN(amountA).mul(new BN(10).pow(new BN(inputToken.decimals)))
-      const ab = new BN(amountB).mul(new BN(10).pow(new BN(outputToken.decimals)))
+      const aa = new BN(Number(amountA) * 10 ** inputToken.decimals)
+      const ab = new BN(Number(amountB) * 10 ** outputToken.decimals)
       const [tokenAInfo, tokenBInfo] = isFront ? [inputToken, outputToken] : [outputToken, inputToken]
       const [tokenAAmount, tokenBAmount] = isFront ? [aa, ab] : [ab, aa]
 
