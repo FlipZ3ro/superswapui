@@ -1,20 +1,36 @@
-"use client"
+'use client'
 
-import React, { useState, useEffect, useMemo, useCallback } from "react"
-import { useWallet } from "@solana/wallet-adapter-react"
-import { createJupiterApiClient } from "@jup-ag/api"
+import React, { useState, useCallback, useEffect } from 'react'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { Connection, PublicKey, Transaction, SystemProgram, ComputeBudgetProgram, SYSVAR_RENT_PUBKEY, VersionedTransaction } from '@solana/web3.js'
+import { createJupiterApiClient } from '@jup-ag/api'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2, ArrowDownUp, Search } from "lucide-react"
+import { Loader2, ArrowDownUp, Upload } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Connection, VersionedTransaction } from "@solana/web3.js"
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token'
+import { AnchorProvider, BN, Idl, Program } from '@coral-xyz/anchor'
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
+import { irysUploader } from '@metaplex-foundation/umi-uploader-irys'
+import { mplToolbox } from '@metaplex-foundation/mpl-toolbox'
+import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters'
+import { CREATE_CPMM_POOL_PROGRAM, getCreatePoolKeys, makeCreateAmmConfig, makeCreateCpmmPoolInInstruction, makeInitializeMetadata, METADATA_PROGRAM_ID } from 'tokengobbler'
 
-const jupiterApi = createJupiterApiClient({ basePath: "https://superswap.fomo3d.fun" })
+async function shortenUri(url: string): Promise<string> {
+  try {
+    const response = await fetch(`http://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`)
+    return await response.text()
+  } catch (error) {
+    console.error('Error shortening URL:', error)
+    return url.substring(0, 200)
+  }
+}
 
 interface TokenInfo {
   address: string;
+  programId?: PublicKey;
   balance?: number;
   symbol: string;
   name: string;
@@ -22,7 +38,18 @@ interface TokenInfo {
   logoURI: string;
 }
 
-export function JupiterSwapForm() {
+const PROGRAM_IDS = ['CVF4q3yFpyQwV8DLDiJ9Ew6FFLE1vr5ToRzsXYQTaNrj']
+const cpmm = new PublicKey('CPMMQ1ELcDDe1DCbMw9YNE1n2MiMbQZgKQYBmZJGBFXh')
+
+export default function JupiterSwapForm() {
+  const [programs, setPrograms] = useState<{ [key: string]: Program<any> }>({})
+  const [poolExists, setPoolExists] = useState(false)
+  const [tokenName, setTokenName] = useState("")
+  const [tokenSymbol, setTokenSymbol] = useState("")
+  const [tokenDescription, setTokenDescription] = useState("")
+  const [tokenImage, setTokenImage] = useState<File | null>(null)
+  const jupiterApi = createJupiterApiClient({ basePath: "https://superswap.fomo3d.fun" })
+
   const wallet = useWallet()
   const [isLoading, setIsLoading] = useState(false)
   const [tokens, setTokens] = useState<TokenInfo[]>([])
@@ -36,8 +63,12 @@ export function JupiterSwapForm() {
   const [quoteResponse, setQuoteResponse] = useState<any>(null)
   const [searchInput, setSearchInput] = useState("")
   const [searchOutput, setSearchOutput] = useState("")
-  const [isInputSelectOpen, setIsInputSelectOpen] = useState(false)
-  const [isOutputSelectOpen, setIsOutputSelectOpen] = useState(false)
+
+  const inputToken = tokens.find(t => t.address === formValue.inputMint);
+  const outputToken = allTokens.find(t => t.address === formValue.outputMint);
+
+  const endpoint = "https://rpc.ironforge.network/mainnet?apiKey=01HRZ9G6Z2A19FY8PR4RF4J4PW"
+  const connection = new Connection(endpoint)
 
   useEffect(() => {
     const fetchTokens = async () => {
@@ -94,8 +125,6 @@ export function JupiterSwapForm() {
             if (page === 1 && pageTokens.length > 1) {
               setFormValue(prev => ({
                 ...prev,
-                inputMint: "So11111111111111111111111111111111111111112",
-                outputMint: "BQpGv6LVWG1JRm1NdjerNSFdChMdAULJr3x9t2Swpump"
               }));
             }
             
@@ -113,8 +142,6 @@ export function JupiterSwapForm() {
         if (userTokens.length > 1) {
           setFormValue(prev => ({
             ...prev,
-            inputMint: "So11111111111111111111111111111111111111112",
-            outputMint: topTokens[0]?.address || ""
           }));
         }
       } catch (error) {
@@ -122,14 +149,10 @@ export function JupiterSwapForm() {
       }
     };
     fetchTokens()
-  }, [wallet, wallet.publicKey])
+  }, [wallet.publicKey])
 
-  const inputToken = useMemo(() => tokens.find(t => t.address === formValue.inputMint), [tokens, formValue.inputMint])
-  const outputToken = useMemo(() => allTokens.find(t => t.address === formValue.outputMint), [allTokens, formValue.outputMint])
-  const endpoint = "https://rpc.ironforge.network/mainnet?apiKey=01HRZ9G6Z2A19FY8PR4RF4J4PW"
-  const connection = new Connection(endpoint)
   const fetchQuote = useCallback(async () => {
-    if (!inputToken || !outputToken) return
+    if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken) return
     setIsLoading(true)
     try {
       const amount = (parseFloat(formValue.amount) * (10 ** inputToken.decimals)).toString()
@@ -144,7 +167,7 @@ export function JupiterSwapForm() {
       console.error("Failed to fetch quote:", error)
     }
     setIsLoading(false)
-  }, [formValue, inputToken, outputToken])
+  }, [formValue, inputToken, outputToken, jupiterApi])
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -169,7 +192,6 @@ export function JupiterSwapForm() {
       // Deserialize the transaction
       const swapTransactionBuf = Buffer.from(swapResult.swapTransaction, 'base64');
       const transaction = await wallet.signTransaction(VersionedTransaction.deserialize(swapTransactionBuf));
-      
       
       // Get the latest blockhash
       const latestBlockhash = await connection.getLatestBlockhash();
@@ -210,9 +232,9 @@ export function JupiterSwapForm() {
     return (balance / (10 ** decimals)).toFixed(decimals)
   }
 
-  const handleInputSearch = async (value: string) => {
+  const handleInputSearch = (value: string) => {
     setSearchInput(value);
-    // No API call for search, just filter the existing tokens
+    // Filter the existing tokens
     if (value.length > 0) {
       const filteredTokens = tokens.filter(token => 
         token.symbol.toLowerCase().includes(value.toLowerCase()) ||
@@ -228,148 +250,455 @@ export function JupiterSwapForm() {
   const handleOutputSearch = async (value: string) => {
     setSearchOutput(value);
     if (value.length > 0) {
-      const response = await fetch(`/api/tokens?search=${encodeURIComponent(value)}&limit=100&offset=0`);
+      const response = await fetch(`/api/tokens?search=${encodeURIComponent(value)}&limit=1000&offset=0`);
       const { tokens: searchResults } = await response.json();
       setAllTokens(searchResults);
     } else {
       // If search is cleared, reset to top tokens
-      const response = await fetch('/api/tokens?limit=100&offset=0');
+      const response = await fetch('/api/tokens?limit=1000&offset=0');
       const { tokens: topTokens } = await response.json();
       setAllTokens(topTokens);
     }
   };
 
-  const filteredInputTokens = useMemo(() => tokens.filter(token => 
-    token.symbol.toLowerCase().includes(searchInput.toLowerCase()) ||
-    token.name.toLowerCase().includes(searchInput.toLowerCase())
-  ), [tokens, searchInput])
+  const umi = wallet.publicKey
+    ? createUmi(connection.rpcEndpoint)
+        .use(irysUploader())
+        .use(mplToolbox())
+        .use(walletAdapterIdentity(wallet as any))
+    : null
 
-  const filteredOutputTokens = useMemo(() => allTokens.filter(token => 
-    token.symbol.toLowerCase().includes(searchOutput.toLowerCase()) ||
-    token.name.toLowerCase().includes(searchOutput.toLowerCase())
-  ), [allTokens, searchOutput]);
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      if (!wallet.publicKey) return;
+
+      const provider = new AnchorProvider(connection, wallet as any, {});
+      const fetchedPrograms: { [key: string]: Program<any> } = {};
+
+      for (const programId of PROGRAM_IDS) {
+        try {
+          const program = new Program(await Program.fetchIdl(new PublicKey(programId), provider) as Idl, provider)
+          fetchedPrograms[programId] = program;
+        } catch (error) {
+          console.error(`Error fetching program ${programId}:`, error);
+        }
+      }
+
+      setPrograms(fetchedPrograms);
+    };
+
+    fetchPrograms();
+  }, [wallet.publicKey]);
+const [checkedPools, setCheckedPools] = useState<Set<string>>(new Set());
+
+const checkPoolExists = useCallback(async () => {
+  if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken || !wallet.publicKey) return;
+
+  const configId = 0
+  const [ammConfigKey, _bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from('amm_config'), new BN(configId).toArrayLike(Buffer, 'be', 8)],
+    CREATE_CPMM_POOL_PROGRAM
+  )
+    const poolKeys = getCreatePoolKeys({
+    creator: wallet.publicKey,
+    programId: CREATE_CPMM_POOL_PROGRAM,
+    mintA: new PublicKey(inputToken.address),
+    mintB: new PublicKey(outputToken.address),
+    configId: ammConfigKey
+  })  
+console.log(123123)
+  try {
+    if (checkedPools.has(poolKeys.poolId.toString())) return;
+    const poolInfo = await connection.getAccountInfo(poolKeys.poolId)
+    setPoolExists(!!poolInfo)
+    setCheckedPools(prev => new Set(prev).add(poolKeys.poolId.toString()));
+  } catch (error) {
+    console.error('Error checking pool existence:', error)
+    setPoolExists(false)
+    setCheckedPools(prev => new Set(prev).add(poolKeys.poolId.toString()));
+  }
+}, [inputToken, outputToken]);
+
+  useEffect(() => {
+    if (inputToken && outputToken) {
+      checkPoolExists();
+    }
+  }, [inputToken, outputToken]);
+
+  const createGobblerPools = async () => {
+    if (!wallet || !wallet.publicKey || !inputToken || !outputToken || !tokenName || !tokenSymbol || !tokenDescription || !tokenImage || !umi) {
+      console.error('Missing required data for pool creation')
+      return
+    }
+
+    try {
+      console.log('Creating memecoin...')
+
+      const genericFile = {
+        buffer: new Uint8Array(await tokenImage.arrayBuffer()),
+        fileName: tokenImage.name,
+        displayName: tokenImage.name,
+        uniqueName: `${Date.now()}-${tokenImage.name}`,
+        contentType: tokenImage.type,
+        extension: tokenImage.name.split('.').pop() || '',
+        tags: []
+      }
+      const [imageUri] = await umi.uploader.upload([genericFile])
+
+      const metadata = {
+        name: tokenName,
+        symbol: tokenSymbol,
+        description: tokenDescription,
+        seller_fee_basis_points: 500,
+        image: imageUri,
+        attributes: [],
+        properties: {
+          files: [
+            {
+              uri: imageUri,
+              type: tokenImage.type
+            }
+          ],
+          category: 'image'
+        }
+      }
+
+      if (tokenImage.type.startsWith('video/')) {
+        
+        metadata.properties.category = 'video'
+        // @ts-ignore
+        metadata.animation_url = imageUri
+
+        const video = document.createElement('video')
+        video.src = URL.createObjectURL(tokenImage)
+        video.load()
+
+        await new Promise<void>((resolve) => {
+          video.onloadeddata = () => {
+            video.currentTime = 1
+
+            const canvas = document.createElement('canvas')
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+
+            const ctx = canvas.getContext('2d')
+            ctx?.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+            const snapshotImageUri = canvas.toDataURL('image/jpeg')
+
+            metadata.properties.files.push({
+              uri: snapshotImageUri,
+              type: 'image/jpeg'
+            })
+            resolve()
+          }
+        })
+      } else if (tokenImage.type.startsWith('audio/')) {
+        metadata.properties.category = 'audio'
+        // @ts-ignore
+        metadata.animation_url = imageUri
+      }
+
+      const uri = await umi.uploader.uploadJson(metadata)
+
+      const tokenAMint = new PublicKey(inputToken.address)
+      const tokenBMint = new PublicKey(outputToken.address)
+      const isFront = new BN(tokenAMint.toBuffer()).lte(new BN(tokenBMint.toBuffer()))
+
+      const [mintA, mintB] = isFront ? [tokenAMint, tokenBMint] : [tokenBMint, tokenAMint]
+      const [tokenAInfo, tokenBInfo] = isFront ? [inputToken, outputToken] : [outputToken, inputToken]
+      const tokenAAmount = new BN(1000000000) // Adjust as needed
+      const tokenBAmount = new BN(1000000000) // Adjust as needed
+
+      const configId = 0
+      const [ammConfigKey, _bump] = PublicKey.findProgramAddressSync(
+        [Buffer.from('amm_config'), new BN(configId).toArrayLike(Buffer, 'be', 8)],
+        CREATE_CPMM_POOL_PROGRAM
+      )
+      const poolKeys = getCreatePoolKeys({
+        creator: wallet.publicKey,
+        programId: CREATE_CPMM_POOL_PROGRAM,
+        mintA,
+        mintB,
+        configId: ammConfigKey
+      })
+      poolKeys.configId = ammConfigKey
+
+      // Fetch account info for mintA and mintB to get their program IDs
+      const mintAAccountInfo = await connection.getAccountInfo(mintA);
+      const mintBAccountInfo = await connection.getAccountInfo(mintB);
+
+      if (!mintAAccountInfo || !mintBAccountInfo) {
+        throw new Error("Failed to fetch mint account info");
+      }
+
+      // Set the program IDs based on the account owners
+      tokenAInfo.programId = mintAAccountInfo.owner;
+      tokenBInfo.programId = mintBAccountInfo.owner;
+      const startTimeValue = Math.floor(Date.now() / 1000)
+
+      const instructions = [
+        makeCreateCpmmPoolInInstruction(
+          CREATE_CPMM_POOL_PROGRAM,
+          wallet.publicKey,
+          ammConfigKey,
+          poolKeys.authority,
+          poolKeys.poolId,
+          mintA,
+          mintB,
+          poolKeys.lpMint,
+          getAssociatedTokenAddressSync(
+            mintA,
+            wallet.publicKey,
+            true,
+            (tokenAInfo?.programId || TOKEN_PROGRAM_ID )
+          ),
+          getAssociatedTokenAddressSync(
+            mintB,
+            wallet.publicKey,
+            true,
+            (tokenBInfo?.programId || TOKEN_PROGRAM_ID)
+          ),
+          getAssociatedTokenAddressSync(poolKeys.lpMint, wallet.publicKey, true, TOKEN_PROGRAM_ID),
+          poolKeys.vaultA,
+          poolKeys.vaultB,
+          (tokenAInfo?.programId || TOKEN_PROGRAM_ID),
+          (tokenBInfo?.programId || TOKEN_PROGRAM_ID),
+          poolKeys.observationId,
+          tokenAAmount,
+          tokenBAmount,
+          new BN(startTimeValue)
+        ),
+        makeInitializeMetadata(
+          CREATE_CPMM_POOL_PROGRAM,
+          wallet.publicKey,
+          poolKeys.authority,
+          poolKeys.lpMint,
+          METADATA_PROGRAM_ID,
+          PublicKey.findProgramAddressSync(
+            [Buffer.from('metadata'), METADATA_PROGRAM_ID.toBuffer(), poolKeys.lpMint.toBuffer()],
+            METADATA_PROGRAM_ID
+          )[0],
+          SystemProgram.programId,
+          SYSVAR_RENT_PUBKEY,
+          ammConfigKey,
+          poolKeys.poolId,
+          poolKeys.observationId,
+          tokenName,
+          tokenSymbol,
+          await shortenUri(uri)
+        )
+      ]
+      instructions[1].keys.push({
+        pubkey: wallet.publicKey,
+        isSigner: false,
+        isWritable: true
+      })
+
+      const transaction = new Transaction().add(...instructions).add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 333333 }))
+      const { blockhash } = await connection.getLatestBlockhash()
+      transaction.recentBlockhash = blockhash
+      transaction.feePayer = wallet.publicKey
+      if (!wallet.signTransaction) return
+      const signedTransaction = await wallet.signTransaction(transaction)
+      const txid = await connection.sendRawTransaction(signedTransaction.serialize())
+      await connection.confirmTransaction(txid)
+
+      console.log(`Pool creation successful: https://solscan.io/tx/${txid}`)
+      setPoolExists(true)
+    } catch (error) {
+      console.error('Error creating pool:', error)
+    }
+  }
 
   return (
-    <Card className="w-full max-w-md mx-auto bg-neutral text-neutral-content">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center">SuperSwap</CardTitle>
+        <CardTitle>Swap Tokens</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+              Amount
+            </label>
             <Input
-              placeholder="Search input tokens..."
-              value={searchInput}
-              onChange={(e) => handleInputSearch(e.target.value)}
-              className="flex-grow"
+              id="amount"
+              type="number"
+              value={formValue.amount}
+              onChange={(e) => setFormValue({ ...formValue, amount: e.target.value })}
+              className="mt-1"
             />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsInputSelectOpen(!isInputSelectOpen)}
+          </div>
+          <div>
+            <label htmlFor="inputToken" className="block text-sm font-medium text-gray-700">
+              From
+            </label>
+            <Select
+              value={formValue.inputMint}
+              onValueChange={(value) => setFormValue({ ...formValue, inputMint: value })}
             >
-              <Search className="h-4 w-4" />
+              <SelectTrigger id="inputToken">
+                <SelectValue>
+                  {inputToken ? (
+                    <div className="flex items-center">
+                      <img src={inputToken.logoURI} alt={inputToken.symbol} className="w-5 h-5 mr-2" />
+                      <span>{inputToken.symbol}</span>
+                    </div>
+                  ) : (
+                    "Select token"
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search tokens"
+                  value={searchInput}
+                  onChange={(e) => handleInputSearch(e.target.value)}
+                  className="mb-2"
+                />
+                <ScrollArea className="h-[200px]">
+                  {tokens.map((token) => (
+                    <SelectItem key={token.address} value={token.address}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <img src={token.logoURI} alt={token.symbol} className="w-5 h-5 mr-2" />
+                          <span>{token.symbol}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {formatBalance(token.balance, token.decimals)}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </ScrollArea>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-center">
+            <Button variant="outline" size="icon" onClick={switchTokens}>
+              <ArrowDownUp className="h-4 w-4" />
             </Button>
           </div>
-          {isInputSelectOpen && (
-            <ScrollArea className="h-[200px] border rounded-md p-2">
-              {filteredInputTokens.map((token) => (
-                <Button
-                  key={token.address}
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setFormValue((prev) => ({ ...prev, inputMint: token.address }))
-                    setIsInputSelectOpen(false)
-                  }}
-                >
-                  <img src={token.logoURI} alt={token.symbol} className="w-6 h-6 mr-2" />
-                  <span>{token.symbol}</span>
-                </Button>
-              ))}
-            </ScrollArea>
-          )}
-          <Input
-            type="number"
-            placeholder="0.00"
-            value={formValue.amount}
-            onChange={(e) => setFormValue((prev) => ({ ...prev, amount: e.target.value }))}
-          />
-          {inputToken && (
+          <div>
+            <label htmlFor="outputToken" className="block text-sm font-medium text-gray-700">
+              To
+            </label>
+            <Select
+              value={formValue.outputMint}
+              onValueChange={(value) => setFormValue({ ...formValue, outputMint: value })}
+            >
+              <SelectTrigger id="outputToken">
+                <SelectValue>
+                  {outputToken ? (
+                    <div className="flex items-center">
+                      <img src={outputToken.logoURI} alt={outputToken.symbol} className="w-5 h-5 mr-2" />
+                      <span>{outputToken.symbol}</span>
+                    </div>
+                  ) : (
+                    "Select token"
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <Input
+                  placeholder="Search tokens"
+                  value={searchOutput}
+                  onChange={(e) => handleOutputSearch(e.target.value)}
+                  className="mb-2"
+                />
+                <ScrollArea className="h-[200px]">
+                  {allTokens.map((token) => (
+                    <SelectItem key={token.address} value={token.address}>
+                      <div className="flex items-center">
+                        <img src={token.logoURI} alt={token.symbol} className="w-5 h-5 mr-2" />
+                        <span>{token.symbol}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </ScrollArea>
+              </SelectContent>
+            </Select>
+          </div>
+          {quoteResponse && (
             <div className="text-sm">
-              Balance: {formatBalance(inputToken.balance, inputToken.decimals)} {inputToken.symbol}
+              <p>
+                Output:{" "}
+                {(parseFloat(quoteResponse.outAmount) / 10 ** outputToken!.decimals).toFixed(
+                  outputToken!.decimals
+                )}{" "}
+                {outputToken!.symbol}
+              </p>
+              <p>Price Impact: {quoteResponse.priceImpactPct.toFixed(2)}%</p>
             </div>
           )}
         </div>
-        <div className="flex justify-center">
-          <Button variant="outline" size="icon" className="rounded-full" onClick={switchTokens}>
-            <ArrowDownUp className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <Input
-              placeholder="Search output tokens..."
-              value={searchOutput}
-              onChange={(e) => handleOutputSearch(e.target.value)}
-              className="flex-grow"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsOutputSelectOpen(!isOutputSelectOpen)}
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
-          {isOutputSelectOpen && (
-            <ScrollArea className="h-[200px] border rounded-md p-2">
-              {filteredOutputTokens.map((token) => (
-                <Button
-                  key={token.address}
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setFormValue((prev) => ({ ...prev, outputMint: token.address }))
-                    setIsOutputSelectOpen(false)
-                  }}
-                >
-                  <img src={token.logoURI} alt={token.symbol} className="w-6 h-6 mr-2" />
-                  <span>{token.symbol}</span>
-                </Button>
-              ))}
-            </ScrollArea>
-          )}
-          <Input
-            type="number"
-            placeholder="0.00"
-            value={quoteResponse ? (parseFloat(quoteResponse.outAmount) / (10 ** outputToken!.decimals)).toFixed(outputToken!.decimals) : ""}
-            readOnly
-          />
-          {outputToken && (
-            <div className="text-sm">
-              Balance: {formatBalance(outputToken.balance, outputToken.decimals)} {outputToken.symbol}
-            </div>
-          )}
-        </div>
-        {quoteResponse && inputToken && outputToken && (
-          <div className="text-sm">
-            Rate: 1 {inputToken.symbol} = 
-            {(parseFloat(quoteResponse.outAmount) / (10 ** outputToken.decimals) / parseFloat(formValue.amount)).toFixed(6)} {outputToken.symbol}
-          </div>
-        )}
       </CardContent>
       <CardFooter>
-        <Button className="w-full" onClick={handleSwap} disabled={isLoading || !quoteResponse}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading...
-            </>
-          ) : (
-            "Swap"
-          )}
-        </Button>
+        {!poolExists && inputToken && outputToken ? (
+          <div className="w-full space-y-4">
+            <p className="text-center">Pool does not exist. Create it first.</p>
+            <div>
+              <label htmlFor="tokenName" className="block text-sm font-medium text-gray-700">
+                Token Name
+              </label>
+              <Input
+                id="tokenName"
+                value={tokenName}
+                onChange={(e) => setTokenName(e.target.value)}
+                placeholder="Enter token name"
+              />
+            </div>
+            <div>
+              <label htmlFor="tokenSymbol" className="block text-sm font-medium text-gray-700">
+                Token Symbol
+              </label>
+              <Input
+                id="tokenSymbol"
+                value={tokenSymbol}
+                onChange={(e) => setTokenSymbol(e.target.value)}
+                placeholder="Enter token symbol"
+              />
+            </div>
+            <div>
+              <label htmlFor="tokenDescription" className="block text-sm font-medium text-gray-700">
+                Token Description
+              </label>
+              <Input
+                id="tokenDescription"
+                value={tokenDescription}
+                onChange={(e) => setTokenDescription(e.target.value)}
+                placeholder="Enter token description"
+              />
+            </div>
+            <div>
+              <label htmlFor="tokenImage" className="block text-sm font-medium text-gray-700">
+                Token Image
+              </label>
+              <input
+                id="tokenImage"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setTokenImage(e.target.files?.[0] || null)}
+                className="mt-1"
+              />
+            </div>
+            <Button onClick={createGobblerPools} className="w-full">
+              Create Pool
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={handleSwap} disabled={!quoteResponse || isLoading} className="w-full">
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              "Swap"
+            )}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )

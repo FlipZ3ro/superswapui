@@ -3,7 +3,7 @@
 import { WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { JupiterSwapForm } from '@/components/Jupiter'
+import JupiterSwapForm from '@/components/Jupiter'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 
 // Import the Solana Wallet Adapter CSS
