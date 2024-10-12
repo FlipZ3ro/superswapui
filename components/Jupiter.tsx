@@ -155,7 +155,7 @@ export default function JupiterSwapForm() {
     if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken) return
     setIsLoading(true)
     try {
-      const amount = Math.floor(parseFloat(formValue.amount) * (10 ** inputToken.decimals)).toString()
+      const amount = Math.floor(parseFloat(formValue.amount) * (10 ** inputToken.decimals))
       const quote = await jupiterApi.quoteGet({
         inputMint: formValue.inputMint,
         outputMint: formValue.outputMint,
