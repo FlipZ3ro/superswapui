@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2, ArrowDownUp, Upload } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token'
+import { TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token'
 import { AnchorProvider, BN, Idl, Program } from '@coral-xyz/anchor'
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys'
@@ -406,10 +406,10 @@ console.log(123123)
       const isFront = new BN(tokenAMint.toBuffer()).lte(new BN(tokenBMint.toBuffer()))
 
       const [mintA, mintB] = isFront ? [tokenAMint, tokenBMint] : [tokenBMint, tokenAMint]
+      const amountA = new BN(formValue.amount)
+      const amountB = new BN(quoteResponse.outAmount)
       const [tokenAInfo, tokenBInfo] = isFront ? [inputToken, outputToken] : [outputToken, inputToken]
-      const tokenAAmount = new BN(1000000000) // Adjust as needed
-      const tokenBAmount = new BN(1000000000) // Adjust as needed
-
+      const [tokenAAmount, tokenBAmount] = isFront ? [amountA, amountB] : [amountB, amountA]
       const configId = 0
       const [ammConfigKey, _bump] = PublicKey.findProgramAddressSync(
         [Buffer.from('amm_config'), new BN(configId).toArrayLike(Buffer, 'be', 8)],
@@ -495,7 +495,38 @@ console.log(123123)
         isWritable: true
       })
 
-      const transaction = new Transaction().add(...instructions).add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 333333 }))
+
+      const tokenAAccount = await getAssociatedTokenAddressSync(mintA, wallet.publicKey, true, tokenAInfo.programId || TOKEN_PROGRAM_ID);
+      const tokenBAccount = await getAssociatedTokenAddressSync(mintB, wallet.publicKey, true, tokenBInfo.programId || TOKEN_PROGRAM_ID);
+  
+      let preInstructions = [];
+  
+      const tokenAAccountInfo = await connection.getAccountInfo(tokenAAccount);
+      if (!tokenAAccountInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            wallet.publicKey,
+            tokenAAccount,
+            wallet.publicKey,
+            mintA,
+            tokenAInfo.programId || TOKEN_PROGRAM_ID
+          )
+        );
+      }
+  
+      const tokenBAccountInfo = await connection.getAccountInfo(tokenBAccount);
+      if (!tokenBAccountInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            wallet.publicKey,
+            tokenBAccount,
+            wallet.publicKey,
+            mintB,
+            tokenBInfo.programId || TOKEN_PROGRAM_ID
+          )
+        );
+      }
+      const transaction = new Transaction().add(...preInstructions, ...instructions).add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 333333 }))
       const { blockhash } = await connection.getLatestBlockhash()
       transaction.recentBlockhash = blockhash
       transaction.feePayer = wallet.publicKey
