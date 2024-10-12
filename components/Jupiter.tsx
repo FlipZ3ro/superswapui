@@ -20,7 +20,7 @@ import { CREATE_CPMM_POOL_PROGRAM, getCreatePoolKeys, makeCreateAmmConfig, makeC
 
 async function shortenUri(url: string): Promise<string> {
   try {
-    const response = await fetch(`http://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`)
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`)
     return await response.text()
   } catch (error) {
     console.error('Error shortening URL:', error)
