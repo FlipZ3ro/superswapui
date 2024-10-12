@@ -17,7 +17,7 @@ interface TokenInfo {
   };
 }
 
-const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes TTL
+const cache = new NodeCache({ stdTTL: 30000 }); // 5 minutes TTL
 
 async function fetchTokens(): Promise<TokenInfo[]> {
   try {
