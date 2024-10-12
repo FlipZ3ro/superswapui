@@ -26,6 +26,7 @@ export function JupiterSwapForm() {
   const wallet = useWallet()
   const [isLoading, setIsLoading] = useState(false)
   const [tokens, setTokens] = useState<TokenInfo[]>([])
+  const [allTokens, setAllTokens] = useState<TokenInfo[]>([]);
   const [formValue, setFormValue] = useState({
     amount: "1",
     inputMint: "",
@@ -43,7 +44,8 @@ export function JupiterSwapForm() {
       if (!wallet.publicKey) return;
 
       try {
-        let allTokens: TokenInfo[] = [];
+        // Fetch the user's token balances
+        let userTokens: TokenInfo[] = [];
         let page = 1;
         const limit = 100;
         let hasMore = true;
@@ -77,20 +79,17 @@ export function JupiterSwapForm() {
             const pageTokens = result.items
               .filter((item: any) => item.interface === 'FungibleToken' || item.interface === 'FungibleAsset')
               .map((token: any) => {
-                if (!token.content.links?.image) {
-                  return null;
-                }
                 return {
                   address: token.id,
-                  symbol: token.content.metadata?.symbol || '',
-                  name: token.content.metadata?.name || '',
+                  balance: token.token_info?.balance || '0',
+                  symbol: token.symbol || token.content?.metadata?.symbol || '',
+                  name: token.content?.metadata?.name || '',
                   decimals: token.token_info?.decimals || 0,
-                  logoURI: token.content.links.image,
-                  balance: token.token_info?.balance || '0'
+                  logoURI: token.content?.links?.image || '',
                 };
               });
 
-            allTokens = [...allTokens, ...pageTokens];
+            userTokens = [...userTokens, ...pageTokens];
             
             if (page === 1 && pageTokens.length > 1) {
               setFormValue(prev => ({
@@ -100,12 +99,24 @@ export function JupiterSwapForm() {
               }));
             }
             
-            setTokens(allTokens.filter(token => token !== null));
             page++;
           }
         }
 
-        setTokens(allTokens.filter(token => token !== null));
+        setTokens(userTokens.filter(token => token !== null));
+
+        // Fetch the top tokens for the output token list
+        const response = await fetch('/api/tokens?limit=100&offset=0');
+        const { tokens: topTokens } = await response.json();
+        setAllTokens(topTokens);
+
+        if (userTokens.length > 1) {
+          setFormValue(prev => ({
+            ...prev,
+            inputMint: "So11111111111111111111111111111111111111112",
+            outputMint: topTokens[0]?.address || ""
+          }));
+        }
       } catch (error) {
         console.error("Failed to fetch tokens:", error);
       }
@@ -114,7 +125,7 @@ export function JupiterSwapForm() {
   }, [wallet, wallet.publicKey])
 
   const inputToken = useMemo(() => tokens.find(t => t.address === formValue.inputMint), [tokens, formValue.inputMint])
-  const outputToken = useMemo(() => tokens.find(t => t.address === formValue.outputMint), [tokens, formValue.outputMint])
+  const outputToken = useMemo(() => allTokens.find(t => t.address === formValue.outputMint), [allTokens, formValue.outputMint])
   const endpoint = "https://rpc.ironforge.network/mainnet?apiKey=01HRZ9G6Z2A19FY8PR4RF4J4PW"
   const connection = new Connection(endpoint)
   const fetchQuote = useCallback(async () => {
@@ -199,63 +210,42 @@ export function JupiterSwapForm() {
     return (balance / (10 ** decimals)).toFixed(decimals)
   }
 
+  const handleInputSearch = async (value: string) => {
+    setSearchInput(value);
+    if (value.length > 0) {
+      const response = await fetch(`/api/tokens?search=${encodeURIComponent(value)}&limit=100&offset=0`);
+      const { tokens: searchResults } = await response.json();
+      setTokens(searchResults);
+    } else {
+      // If search is cleared, reset to user's tokens
+      setTokens(tokens);
+    }
+  };
+
+  const handleOutputSearch = async (value: string) => {
+    setSearchOutput(value);
+    if (value.length > 0) {
+      const response = await fetch(`/api/tokens?search=${encodeURIComponent(value)}&limit=100&offset=0`);
+      const { tokens: searchResults } = await response.json();
+      setAllTokens(searchResults);
+    } else {
+      // If search is cleared, reset to top tokens
+      const response = await fetch('/api/tokens?limit=100&offset=0');
+      const { tokens: topTokens } = await response.json();
+      setAllTokens(topTokens);
+    }
+  };
+
   const filteredInputTokens = useMemo(() => tokens.filter(token => 
     token.symbol.toLowerCase().includes(searchInput.toLowerCase()) ||
     token.name.toLowerCase().includes(searchInput.toLowerCase())
   ), [tokens, searchInput])
 
-  const [topTokens, setTopTokens] = useState<TokenInfo[]>([]);
+  const filteredOutputTokens = useMemo(() => allTokens.filter(token => 
+    token.symbol.toLowerCase().includes(searchOutput.toLowerCase()) ||
+    token.name.toLowerCase().includes(searchOutput.toLowerCase())
+  ), [allTokens, searchOutput]);
 
-  useEffect(() => {
-    const fetchTopTokens = async () => {
-      try {
-        const response = await fetch('https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 'my-id',
-            method: 'searchAssets',
-            params: {
-              ownerAddress: wallet.publicKey?.toBase58(),
-              tokenType: 'fungible',
-              limit: 1000,
-              page: 1,
-              displayOptions: {
-                showNativeBalance: true,
-              },
-            },
-          }),
-        });
-        const { result } = await response.json();
-        const topTokensData = result.items.map((item: any) => ({
-          address: item.id,
-          symbol: item.token_info?.symbol || '',
-          name: item.content?.metadata?.name || '',
-          decimals: item.token_info?.decimals || 0,
-          logoURI: item.content?.links?.image || '',
-          balance: item.token_info?.balance || '0'
-        }));
-        setTopTokens(topTokensData);
-      } catch (error) {
-        console.error('Error fetching top tokens:', error);
-      }
-    };
-
-    if (wallet.publicKey) {
-      fetchTopTokens();
-    }
-  }, [wallet.publicKey]);
-
-  const filteredOutputTokens = useMemo(() => {
-    const allTokens = [...tokens, ...topTokens];
-    return allTokens.filter((token: TokenInfo) => 
-      token.symbol.toLowerCase().includes(searchOutput.toLowerCase()) ||
-      token.name.toLowerCase().includes(searchOutput.toLowerCase())
-    );
-  }, [tokens, topTokens, searchOutput]);
   return (
     <Card className="w-full max-w-md mx-auto bg-neutral text-neutral-content">
       <CardHeader>
@@ -267,7 +257,7 @@ export function JupiterSwapForm() {
             <Input
               placeholder="Search input tokens..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => handleInputSearch(e.target.value)}
               className="flex-grow"
             />
             <Button
@@ -318,7 +308,7 @@ export function JupiterSwapForm() {
             <Input
               placeholder="Search output tokens..."
               value={searchOutput}
-              onChange={(e) => setSearchOutput(e.target.value)}
+              onChange={(e) => handleOutputSearch(e.target.value)}
               className="flex-grow"
             />
             <Button
