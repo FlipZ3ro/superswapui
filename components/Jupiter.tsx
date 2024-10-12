@@ -221,7 +221,7 @@ export function JupiterSwapForm() {
       setTokens(filteredTokens);
     } else {
       // If search is cleared, reset to original tokens
-      setTokens(originalTokens);
+      setTokens(tokens);
     }
   };
 
