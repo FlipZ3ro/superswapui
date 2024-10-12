@@ -665,10 +665,23 @@ console.log(123123)
           )}
         </div>
       </CardContent>
+      {inputToken && outputToken && quoteResponse && (
+        <div className="mt-4 text-sm">
+          <p className="font-semibold">Token Ratio:</p>
+          <p>
+            {inputToken.symbol}/{outputToken.symbol}:{' '}
+            {(parseFloat(quoteResponse.outAmount) / (10 ** outputToken.decimals) / parseFloat(formValue.amount)).toFixed(6)}
+          </p>
+          <p>
+            {outputToken.symbol}/{inputToken.symbol}:{' '}
+            {(parseFloat(formValue.amount) / (parseFloat(quoteResponse.outAmount) / (10 ** outputToken.decimals))).toFixed(6)}
+          </p>
+        </div>
+      )}
       <CardFooter>
         {!poolExists && inputToken && outputToken ? (
           <div className="w-full space-y-4">
-            <p className="text-center">Gobbler pool does not exist. Create it if you want.</p>
+            <p className="text-center">Gobbler pool does not exist. Create it if you want. The token ratio is the initial price, be careful...</p>
             <div>
               <label htmlFor="tokenName" className="block text-sm font-medium text-gray-700">
                 Token Name
