@@ -677,7 +677,7 @@ console.log(123123)
                 )}{" "}
                 {outputToken!.symbol}
               </p>
-              <p>Price Impact: {quoteResponse.priceImpactPct.toFixed(2)}%</p>
+              <p>Price Impact: {Number(quoteResponse.priceImpactPct).toFixed(2)}%</p>
             </div>
           )}
         </div>
