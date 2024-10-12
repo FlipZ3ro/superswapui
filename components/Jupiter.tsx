@@ -203,13 +203,6 @@ export default function JupiterSwapForm() {
         maxRetries: 2
       });
       
-      // Confirm the transaction
-      await connection.confirmTransaction({
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        signature: txid
-      });
-      
       console.log(`Swap transaction successful: https://solscan.io/tx/${txid}`);
       setSuccess(`Swap transaction successful: https://solscan.io/tx/${txid}`);
     } catch (error) {
@@ -541,6 +534,7 @@ console.log(123123)
       await connection.confirmTransaction(txid)
 
       console.log(`Pool creation successful: https://solscan.io/tx/${txid}`)
+      setSuccess(`Pool creation successful: https://solscan.io/tx/${txid}`)
       setPoolExists(true)
     } catch (error) {
       console.error('Error creating pool:', error)
