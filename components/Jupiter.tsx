@@ -675,7 +675,16 @@ const checkPoolExists = useCallback(async () => {
             </div>
           )}
         </div>
-      </CardContent>
+      </CardContent><Button onClick={handleSwap} disabled={!quoteResponse || isLoading} className="w-full">
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              "Swap"
+            )}
+          </Button>
       <CardFooter>
         {!poolExists && inputToken && outputToken ? (
           <div className="w-full space-y-4">
@@ -752,16 +761,7 @@ const checkPoolExists = useCallback(async () => {
             </Button>
           </div>
         ) : (
-          <Button onClick={handleSwap} disabled={!quoteResponse || isLoading} className="w-full">
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              "Swap"
-            )}
-          </Button>
+          <></>
         )}
       </CardFooter>
     </Card>
