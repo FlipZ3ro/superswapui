@@ -40,7 +40,16 @@ async function updateCache() {
   try {
     const tokens = await fetchTokens();
     if (tokens.length > 0) {
-      cache.set('tokens', tokens);
+      cache.set('allTokens', tokens);
+      
+      // Pre-fetch and cache top tokens
+      const topTokensResponse = await fetch(TOP_TOKENS_URL);
+      if (topTokensResponse.ok) {
+        const topTokenAddresses: string[] = await topTokensResponse.json();
+        const topTokens = tokens.filter(token => topTokenAddresses.includes(token.address));
+        cache.set('topTokens', topTokens);
+      }
+      
       console.log('Token cache updated');
     } else {
       console.error('No tokens fetched, cache not updated');
@@ -66,25 +75,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let tokens: TokenInfo[];
 
       if (search) {
-        // Use cached or fetched tokens when search is provided
-        tokens = cache.get('tokens') as TokenInfo[] || await fetchTokens();
+        tokens = cache.get('allTokens') as TokenInfo[] || await fetchTokens();
         
-        // Filter tokens based on search
+        const searchLower = (search as string).toLowerCase();
         tokens = tokens.filter(token => 
-          token.name.toLowerCase().includes((search as string).toLowerCase()) ||
-          token.symbol.toLowerCase().includes((search as string).toLowerCase())
+          token.name.toLowerCase().includes(searchLower) ||
+          token.symbol.toLowerCase().includes(searchLower)
         );
       } else {
-        // Fetch top tokens when no search is provided
-        const response = await fetch(TOP_TOKENS_URL);
-        if (!response.ok) {
-          throw new Error('Failed to fetch top tokens');
+        tokens = cache.get('topTokens') as TokenInfo[] || [];
+        if (tokens.length === 0) {
+          const allTokens = cache.get('allTokens') as TokenInfo[] || await fetchTokens();
+          const topTokensResponse = await fetch(TOP_TOKENS_URL);
+          if (topTokensResponse.ok) {
+            const topTokenAddresses: string[] = await topTokensResponse.json();
+            tokens = allTokens.filter(token => topTokenAddresses.includes(token.address));
+            cache.set('topTokens', tokens);
+          } else {
+            tokens = allTokens;
+          }
         }
-        const topTokenAddresses: string[] = await response.json();
-        
-        // Fetch full token info for top tokens
-        const allTokens = cache.get('tokens') as TokenInfo[] || await fetchTokens();
-        tokens = allTokens.filter(token => topTokenAddresses.includes(token.address));
       }
 
       // Apply pagination

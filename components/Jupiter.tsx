@@ -155,11 +155,11 @@ export default function JupiterSwapForm() {
     if (formValue.inputMint == "" || formValue.outputMint == "" || !inputToken || !outputToken) return
     setIsLoading(true)
     try {
-      const amount = (parseFloat(formValue.amount) * (10 ** inputToken.decimals)).toString()
+      const amount = Math.floor(parseFloat(formValue.amount) * (10 ** inputToken.decimals)).toString()
       const quote = await jupiterApi.quoteGet({
         inputMint: formValue.inputMint,
         outputMint: formValue.outputMint,
-        amount: Number(amount),
+        amount: amount,
         slippageBps: formValue.slippage * 100,
       })
       setQuoteResponse(quote)
@@ -167,17 +167,17 @@ export default function JupiterSwapForm() {
       console.error("Failed to fetch quote:", error)
     }
     setIsLoading(false)
-  }, [ inputToken, outputToken])
+  }, [formValue, inputToken, outputToken])
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      if (formValue.inputMint && formValue.outputMint && formValue.amount) {
+      if (formValue.inputMint && formValue.outputMint && formValue.amount && parseFloat(formValue.amount) > 0) {
         fetchQuote()
       }
     }, 500) // Debounce for 500ms
 
     return () => clearTimeout(debounceTimer)
-  }, [formValue.amount, formValue.inputMint, formValue.outputMint])
+  }, [formValue.amount, formValue.inputMint, formValue.outputMint, fetchQuote])
 
   const handleSwap = async () => {
     if (!quoteResponse || !wallet.publicKey || !wallet.signTransaction) return
@@ -293,14 +293,7 @@ const checkPoolExists = useCallback(async () => {
   const [ammConfigKey, _bump] = PublicKey.findProgramAddressSync(
     [Buffer.from('amm_config'), new BN(configId).toArrayLike(Buffer, 'be', 8)],
     CREATE_CPMM_POOL_PROGRAM
-  )
-    const poolKeys = getCreatePoolKeys({
-    creator: wallet.publicKey,
-    programId: CREATE_CPMM_POOL_PROGRAM,
-    mintA: new PublicKey(inputToken.address),
-    mintB: new PublicKey(outputToken.address),
-    configId: ammConfigKey
-  })  
+  )  
 console.log(123123)
   try {
     if (checkedPools.has(poolKeys.poolId.toString())) return;
