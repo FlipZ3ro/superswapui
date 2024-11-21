@@ -48,7 +48,7 @@ export default function JupiterSwapForm() {
   const [tokenSymbol, setTokenSymbol] = useState("")
   const [tokenDescription, setTokenDescription] = useState("")
   const [tokenImage, setTokenImage] = useState<File | null>(null)
-  const jupiterApi = createJupiterApiClient({ basePath: "https://fomo3d.me" })
+  const jupiterApi = createJupiterApiClient({ basePath: "http://143.110.238.107:8888" })
 
   const wallet = useWallet()
   const [isLoading, setIsLoading] = useState(false)
