@@ -82,7 +82,7 @@ export default function JupiterSwapForm() {
         let hasMore = true;
 
         while (hasMore) {
-          const response = await fetch('https://mainnet.helius-rpc.com/?api-key=0d4b4fd6-c2fc-4f55-b615-a23bab1ffc85', {
+          const response = await fetch('https://cold-hanni-fast-mainnet.helius-rpc.com/', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
